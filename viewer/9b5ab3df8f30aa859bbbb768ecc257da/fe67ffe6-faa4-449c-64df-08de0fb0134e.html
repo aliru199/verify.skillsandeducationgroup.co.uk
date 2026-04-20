@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link href="/assets/vendors/global/vendors.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="/assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    <script src='/lib/pdfjs-express-viewer/webviewer.min.js'></script>
+    <script src="/lib/jquery/dist/jquery.min.js?v=_JqT3SQfawRcv_BIHPThkBvs0OEvtFFmqPF_lYI_Cxo"></script>
+    <script src="/assets/vendors/global/vendors.bundle.js"></script>
+    <script src="/lib/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="/lib/abp-web-resources/Abp/Framework/scripts/abp.js?v=EjNSmvtPSqCVK_xG_aTvOp8hmVM_7vwyd3hg45CAMGk"></script>
+    <script src="/lib/abp-web-resources/Abp/Framework/scripts/libs/abp.jquery.js?v=XEXcdRYb4eN3XoQCbnM-BSR6UifHRLsXYDIVFZ7Oc6Q"></script>
+    <script src="/lib/abp-web-resources/Abp/Framework/scripts/libs/abp.sweet-alert.js?v=fPp3O_ILaqD0UHiR721w1i4iBtxo3NH7yfldI5dg0_I"></script>
+    <script src="/js/extensions.js"></script>
+    <script src="/AbpServiceProxies/GetAll" type="text/javascript"></script>
+    <script src="/AbpScripts/GetScripts" type="text/javascript"></script>
+    <title>Document Viewer</title>
+</head>
+
+<body>
+    <div id='viewer' style="margin:0 auto" class="w-100 h-100"></div>
+
+    <script type="text/javascript">
+        let printingNotAvailable = LWithSource("DCWEB", "Warning:DocumentViewer:PrintingNotAvailable");
+        let checkingIfCanPrint = LWithSource("DCWEB", "Warning:DocumentViewer:CheckingIfCanPrint");
+
+        WebViewer({
+            path: '/lib/pdfjs-express-viewer/public',
+            licenseKey: 'zTGQv8qKHpKxX4rECH9R'
+        },
+        document.getElementById('viewer'))
+        .then(instance => {
+            const { Core, UI } = instance;
+            instance.UI.disableElements(['contextMenuPopup', 'selectToolButton', 'themeChangeButton', 'languageButton']);
+
+                instance.UI.disableFeatures([instance.UI.Feature.Print]);
+    
+                instance.UI.disableFeatures([instance.UI.Feature.Download]);
+            
+            instance.UI.disableFeatures([
+                instance.UI.Feature.PageNavigation,
+                instance.UI.Feature.Search,
+                instance.UI.Feature.TextSelection,
+                instance.UI.Feature.Annotations
+            ]);
+
+                instance.UI.loadDocument("/viewer/verify/render/9b5ab3df8f30aa859bbbb768ecc257da", { filename: '9b5ab3df8f30aa859bbbb768ecc257da.pdf' });
+
+            function recreateNode(el, withChildren) {
+                if (withChildren) {
+                    el.parentNode.replaceChild(el.cloneNode(true), el);
+                }
+                else {
+                    var newEl = el.cloneNode(false);
+                    while (el.hasChildNodes()) newEl.appendChild(el.firstChild);
+                    el.parentNode.replaceChild(newEl, el);
+                }
+            }
+
+            function getDownloadButton(instance) {
+                return instance.iframeWindow.document.querySelector('[data-element="downloadButton"]');
+            }
+
+            Core.documentViewer.addEventListener('documentLoaded', () => {
+                let downloadButton = getDownloadButton(instance);
+                recreateNode(downloadButton, true);
+                downloadButton = getDownloadButton(instance);
+
+                downloadButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    window.open("/viewer/download/fe67ffe6-faa4-449c-64df-08de0fb0134e/9b5ab3df8f30aa859bbbb768ecc257da");
+                });
+            });
+
+            const iframeDoc = instance.UI.iframeWindow.document;
+            const modalPrintButton = iframeDoc.querySelector('.PrintModal .button');
+
+            modalPrintButton.addEventListener('click', () => {
+                IncreaseUserPrintCount("fe67ffe6-faa4-449c-64df-08de0fb0134e");
+            });
+
+            const UIEvents = instance.UI.Events;
+            instance.UI.addEventListener(UIEvents.VISIBILITY_CHANGED, e => {
+                const { element, isVisible } = e.detail;
+                if (element === 'printModal' && isVisible) {
+
+                    const iframeDoc = instance.UI.iframeWindow.document;
+                    const modalPrintButton = iframeDoc.querySelector('.PrintModal .button');
+                    const modalPrintButtons = $(iframeDoc.querySelector('.PrintModal .buttons'));
+
+                    $(modalPrintButton).parent().append('<p>' + checkingIfCanPrint + '</p>');
+                    $(modalPrintButton).hide();
+
+                    CanPrint("fe67ffe6-faa4-449c-64df-08de0fb0134e").then(
+                        function (data) {
+                            if (!data.result.ExceededPrintLimit) {
+                                const pChildren = modalPrintButtons.children("p");
+                                $(pChildren).hide();
+                                if (pChildren != null) {
+                                    $(pChildren).hide();
+                                }
+                                $(modalPrintButton).show();
+                            } else {
+                                const pChildren = modalPrintButtons.children("p");
+                                $(pChildren).hide();
+                                $(modalPrintButton).parent().append('<p>' + printingNotAvailable + '</p>');
+                            }
+                        }
+                    );
+                }
+            });
+        });
+
+        const CanPrint = (recordId) => {
+            return new Promise((resolve, reject) => {
+                $.ajax({
+                    type: 'GET',
+                    url: "/Viewer/CheckRecordLimits?id=" + recordId
+                }).done(function (result) {
+                    resolve(result);
+                }).catch(function (error) {
+                    reject(error);
+                });
+            });
+        };
+
+        const IncreaseUserPrintCount = (recordId) => {
+            return new Promise((resolve, reject) => {
+                $.ajax({
+                    type: 'GET',
+                    url: "/Viewer/IncreaseUserPrintCount?id=" + recordId
+                }).done(function (result) {
+                    resolve(result);
+                }).catch(function (error) {
+                    reject(error);
+                });
+            });
+        };
+
+    </script>
+</body>
+</html>
